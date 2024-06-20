@@ -1,0 +1,70 @@
+select * from credit_card
+--top 5 city that has spend highest amount on credit card 
+select top 5 city,SUM(amount)total_amount from credit_card group by city order by total_amount desc
+
+--top 5 city that has spend least amount on credit card 
+select top 5 city,SUM(amount)total_amount from credit_card group by city order by total_amount 
+
+--frequency of the card usage for different kinds of expenses.
+select exp_type, COUNT(card_type)as c from credit_card group by Exp_Type order by COUNT(card_type) desc
+
+--mojority card_type
+select card_type,COUNT(card_type)c from credit_card group by Card_Type order by  COUNT(card_type) desc
+
+--where the card usage was most among the  different card types available for different exp_type
+
+with cte as(
+select card_type,exp_type,COUNT(exp_type)c from credit_card group by card_type,exp_type ),cte2 as(
+
+select *,DENSE_RANK() over(PARTITION by card_type order by c desc)rk  from cte)
+
+select card_type,exp_type,c from cte2 where rk=1
+
+--for different exp_type which card type is used the most
+with cte as(
+select exp_type,card_type,COUNT(card_type)c from credit_card group by exp_type,card_type),cte2 as(
+
+select *,DENSE_RANK() over(PARTITION by exp_type order by c desc)rk  from cte)
+
+select exp_type,card_type from cte2 where rk=1
+
+--city wise max total transactions based on exp_type
+with cte as(
+select city,Exp_Type,sum(amount)s  from credit_card group by city,Exp_Type ),cte2 as(
+
+select *,DENSE_RANK() over(partition by city order by s desc)rk from cte)
+
+select city ,exp_type,s  from cte2 where rk=1
+
+--mom credit card spending for the year 2014
+with cte as(
+select datename(month,date)month,month(date)date_month,SUM(amount)amount_spent from credit_card where YEAR(Date)='2014'
+group by datename(month,date),month(date)),cte2 as(
+
+select *,lag(amount_spent,1,amount_spent) over(order by date_month)prev_month from cte)
+
+select MONTH,cast((amount_spent-prev_month)*100.00/prev_month AS decimal(10,2)) as MOM_spend from cte2
+
+--female spending analysis
+select exp_type,COUNT(exp_type)c from credit_card where Gender='F' group by exp_type order by c desc
+
+---male spending anaysis
+select exp_type,COUNT(exp_type)c from credit_card where Gender='M' group by exp_type order by c desc
+
+--what card type is mostly used by men and  women
+
+with cte as(
+select gender, card_type,COUNT(card_type)c from credit_card group by gender,card_type),cte2 as(
+
+select gender,card_type,c,DENSE_RANK() over(partition by gender order by c desc)rk from cte)
+
+select gender,card_type from cte2 where rk=1
+
+---wow growth based on different card type for the month of june ,2024
+with cte as(
+select  distinct card_type,DATEPART(week,date)week_num,
+SUM(Amount) over(partition by card_type,DATEPART(week,date) order by date rows between unbounded preceding and unbounded following)sum1
+from credit_card where YEAR(date)='2014' and MONTH(date)='6')
+
+select *,cast ((sum1-LAG(sum1,1,sum1) over(partition by card_type order by week_num))*100.00/LAG(sum1,1,sum1) 
+over(partition by card_type order by week_num) as dec(10,2))ratio from cte
